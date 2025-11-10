@@ -1,4 +1,4 @@
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
@@ -9,6 +9,9 @@ using MsBox.Avalonia;
 using MsBox.Avalonia.Enums;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
+using System.Text;
+using Image = SixLabors.ImageSharp.Image;
+using ImageFormat = BlpConverter.Config.ImageFormat;
 
 namespace BlpConverter;
 
@@ -16,7 +19,7 @@ public partial class MainWindow : Window
 {
     private AppConfig config;
     private string currentFilePath;
-    private BlpFile currentBlpFile;
+    private Image currentImage;
 
     public MainWindow()
     {
@@ -53,7 +56,7 @@ public partial class MainWindow : Window
         CmbCompression.SelectedIndex = (int)config.ConversionSettings.BlpCompressionFormat;
         CmbCompression.SelectionChanged += (_, _) =>
         {
-            config.ConversionSettings.BlpCompressionFormat = (BlpCompressionFormat)CmbCompression.SelectedIndex;
+            config.ConversionSettings.BlpCompressionFormat = (RustBlpConverter.BlpCompression)CmbCompression.SelectedIndex;
             config.Save();
         };
 
@@ -132,13 +135,13 @@ public partial class MainWindow : Window
             string ext = Path.GetExtension(filePath).ToLowerInvariant();
 
             // Clear previous file
-            currentBlpFile?.Dispose();
-            currentBlpFile = null;
+            currentImage?.Dispose();
+            currentImage = null;
             PreviewImage.Source = null;
 
             if (ext == ".blp")
                 await LoadBlpFile(filePath);
-            else if (ext == ".png" || ext == ".jpg" || ext == ".jpeg")
+            else if (ext is ".png" or ".jpg" or ".jpeg")
                 await LoadImageFile(filePath);
             else
                 await ShowMessage("Error", "Unsupported file format. Please select a BLP, PNG, or JPEG file.", MsBox.Avalonia.Enums.Icon.Error);
@@ -151,31 +154,60 @@ public partial class MainWindow : Window
 
     private async Task LoadBlpFile(string filePath)
     {
-        await using var fs = File.OpenRead(filePath);
-        currentBlpFile = new BlpFile(fs);
-
-        // Load preview using ImageSharp and convert to Avalonia bitmap
-        var imageSharp = currentBlpFile.GetImage(0);
+        currentImage = RustBlpConverter.LoadBlp(filePath);
         using var ms = new MemoryStream();
-        await imageSharp.SaveAsPngAsync(ms);
+        await currentImage.SaveAsPngAsync(ms);
         ms.Position = 0;
         PreviewImage.Source = new Bitmap(ms);
 
-        // Display file info
-        var info = new System.Text.StringBuilder();
-        info.AppendLine($"File: {Path.GetFileName(filePath)}");
-        info.AppendLine($"Format: BLP");
-        info.AppendLine();
-        info.AppendLine($"Dimensions: {currentBlpFile.Width}x{currentBlpFile.Height}");
-        info.AppendLine($"Mipmaps: {currentBlpFile.MipMapCount}");
-        info.AppendLine();
-        info.AppendLine($"Encoding: {currentBlpFile.ColorEncoding}");
-        info.AppendLine($"Pixel Format: {currentBlpFile.PixelFormat}");
-        info.AppendLine($"Alpha Depth: {currentBlpFile.AlphaDepth} bit");
-        info.AppendLine();
-        info.AppendLine($"File Size: {new FileInfo(filePath).Length / 1024.0:F2} KB");
+        RustBlpConverter.BlpInfo info = new();
+        int result = RustBlpConverter.blp_get_info_extended(filePath, ref info);
 
-        FileInfoText.Text = info.ToString();
+        if (result != 0)
+            return;
+
+        // Display file info
+        var output = new StringBuilder();
+        output.AppendLine($"File: {Path.GetFileName(filePath)}");
+        output.AppendLine($"Path: {Path.GetDirectoryName(filePath)}");
+        output.AppendLine($"Size: {new FileInfo(filePath).Length / 1024.0:F2} KB");
+        output.AppendLine($"Uncompressed size: {CalculateMemoryUsage(info):F2} KB");
+        output.AppendLine();
+
+        // Basic Information
+        output.AppendLine("BASIC INFORMATION:");
+        output.AppendLine($"  Format:       BLP (Version {info.Version})");
+        output.AppendLine($"  Dimensions:   {info.Width}x{info.Height}");
+        output.AppendLine($"  Mipmaps:      {info.MipmapCount} level(s)");
+        output.AppendLine($"  Has Mipmaps:  {(info.HasMipmaps != 0 ? "Yes" : "No")}");
+        output.AppendLine();
+
+        // Encoding Information
+        output.AppendLine("ENCODING INFORMATION:");
+        output.AppendLine($"  Content Type: {GetContentTypeName(info.Content)}");
+        output.AppendLine($"  Compression:  {GetCompressionName(info.Compression)}");
+        output.AppendLine($"  Pixel Format: {GetPixelFormatName(info.Compression, info.AlphaBits)}");
+        output.AppendLine($"  Alpha Depth:  {info.AlphaBits} bit");
+        
+        if (info.Version == RustBlpConverter.BlpVersion.BLP2) // BLP2
+            output.AppendLine($"  Alpha Type:   {info.AlphaType}");
+
+        output.AppendLine();
+
+        // Mipmap Details
+        if (info.MipmapCount > 1)
+        {
+            output.AppendLine("MIPMAP LEVELS:");
+
+            for (uint i = 0; i < info.MipmapCount && i < 16; i++)
+            {
+                uint w = Math.Max(1, info.Width >> (int)i);
+                uint h = Math.Max(1, info.Height >> (int)i);
+                output.AppendLine($"  Level {i}: {w}x{h} ({w * h} pixels)");
+            }
+        }
+
+        FileInfoText.Text = output.ToString();
 
         // Enable conversion buttons
         BtnConvertToPng.IsEnabled = true;
@@ -185,7 +217,7 @@ public partial class MainWindow : Window
 
     private async Task LoadImageFile(string filePath)
     {
-        using var image = await SixLabors.ImageSharp.Image.LoadAsync(filePath);
+        using var image = await Image.LoadAsync(filePath);
 
         using var ms = new MemoryStream();
         await image.SaveAsPngAsync(ms);
@@ -193,7 +225,7 @@ public partial class MainWindow : Window
         PreviewImage.Source = new Bitmap(ms);
 
         // Display file info
-        var info = new System.Text.StringBuilder();
+        var info = new StringBuilder();
         info.AppendLine($"File: {Path.GetFileName(filePath)}");
         info.AppendLine($"Format: {Path.GetExtension(filePath).TrimStart('.').ToUpperInvariant()}");
         info.AppendLine($"Size: {image.Width}x{image.Height}");
@@ -209,7 +241,8 @@ public partial class MainWindow : Window
 
     private async void BtnConvertToPng_Click(object sender, RoutedEventArgs e)
     {
-        if (currentBlpFile == null) return;
+        if (currentImage == null)
+            return;
 
         var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
@@ -223,8 +256,7 @@ public partial class MainWindow : Window
         {
             try
             {
-                var image = currentBlpFile.GetImage(0);
-                await image.SaveAsPngAsync(file.Path.LocalPath);
+                await currentImage.SaveAsPngAsync(file.Path.LocalPath);
                 await ShowMessage("Success", "File converted successfully!", MsBox.Avalonia.Enums.Icon.Success);
             }
             catch (Exception ex)
@@ -236,7 +268,7 @@ public partial class MainWindow : Window
 
     private async void BtnConvertToJpeg_Click(object sender, RoutedEventArgs e)
     {
-        if (currentBlpFile == null)
+        if (currentImage == null)
             return;
 
         var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
@@ -251,8 +283,7 @@ public partial class MainWindow : Window
         {
             try
             {
-                var image = currentBlpFile.GetImage(0);
-                await image.SaveAsJpegAsync(file.Path.LocalPath, new JpegEncoder { Quality = config.ConversionSettings.JpegQuality });
+                await currentImage.SaveAsJpegAsync(file.Path.LocalPath, new JpegEncoder { Quality = config.ConversionSettings.JpegQuality });
                 await ShowMessage("Success", "File converted successfully!", MsBox.Avalonia.Enums.Icon.Success);
             }
             catch (Exception ex)
@@ -279,7 +310,7 @@ public partial class MainWindow : Window
         {
             try
             {
-                BlpWriter.SaveBlp(currentFilePath, file.Path.LocalPath, config.ConversionSettings);
+                RustBlpConverter.ImageToBlp(currentFilePath, file.Path.LocalPath, config.ConversionSettings.BlpCompressionFormat, config.ConversionSettings.GenerateMipmaps ? 0 : 1);
                 await ShowMessage("Success", "File converted successfully!", MsBox.Avalonia.Enums.Icon.Success);
             }
             catch (Exception ex)
@@ -376,23 +407,17 @@ public partial class MainWindow : Window
                 {
                     if (ext == ".blp")
                     {
-                        using var fs = File.OpenRead(sourceFile);
-                        using var blp = new BlpFile(fs);
-                        var image = blp.GetImage(0);
+                        using var image = RustBlpConverter.LoadBlp(sourceFile);
 
                         if (config.ConversionSettings.DefaultOutputFormat == ImageFormat.Png)
-                        {
                             image.SaveAsPng(targetFile);
-                        }
                         else
                         {
                             image.SaveAsJpeg(targetFile, new JpegEncoder { Quality = config.ConversionSettings.JpegQuality });
                         }
                     }
                     else
-                    {
-                        BlpWriter.SaveBlp(sourceFile, targetFile, config.ConversionSettings);
-                    }
+                        RustBlpConverter.ImageToBlp(sourceFile, targetFile, config.ConversionSettings.BlpCompressionFormat, config.ConversionSettings.GenerateMipmaps ? 0 : 1);
                 });
 
                 BatchProgressBar.Value = i + 1;
@@ -421,7 +446,81 @@ public partial class MainWindow : Window
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {
-        currentBlpFile?.Dispose();
+        currentImage?.Dispose();
         base.OnClosing(e);
     }
+
+    #region MyRegion
+
+    static string GetContentTypeName(uint content)
+    {
+        return content switch
+        {
+            0 => "JPEG (compressed)",
+            1 => "Direct (raw pixel data)",
+            _ => $"Unknown ({content})"
+        };
+    }
+
+    static string GetCompressionName(uint compression)
+    {
+        return compression switch
+        {
+            0 => "JPEG",
+            1 => "Raw1 (Uncompressed)",
+            2 => "DXTC (DXT1/DXT3/DXT5)",
+            3 => "Raw3 (Uncompressed with palette)",
+            _ => $"Unknown ({compression})"
+        };
+    }
+
+    static string GetPixelFormatName(uint compression, uint alphaBits)
+    {
+        if (compression == 2) // DXTC
+        {
+            return alphaBits switch
+            {
+                0 => "DXT1 (RGB, no alpha)",
+                1 => "DXT1 (RGB + 1-bit alpha)",
+                8 => "DXT5 (RGBA, 8-bit alpha)",
+                _ => $"DXT (unknown alpha: {alphaBits}-bit)"
+            };
+        }
+        else if (compression == 1) // Raw1
+        {
+            return alphaBits switch
+            {
+                0 => "RGB24",
+                8 => "RGBA32",
+                _ => $"Raw ({alphaBits}-bit alpha)"
+            };
+        }
+        else if (compression == 3) // Raw3
+        {
+            return "Paletted (256 colors, 4-bit alpha)";
+        }
+        else // JPEG
+        {
+            return "JPEG (lossy)";
+        }
+    }
+
+    static double CalculateMemoryUsage(RustBlpConverter.BlpInfo info)
+    {
+        double totalBytes = 0;
+        uint width = info.Width;
+        uint height = info.Height;
+
+        // Calculate for all mipmap levels
+        for (uint i = 0; i < info.MipmapCount; i++)
+        {
+            uint w = Math.Max(1, width >> (int)i);
+            uint h = Math.Max(1, height >> (int)i);
+            totalBytes += w * h * 4; // RGBA = 4 bytes per pixel
+        }
+
+        return totalBytes / 1024.0; // Convert to KB
+    }
+
+    #endregion
 }

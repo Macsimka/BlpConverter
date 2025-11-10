@@ -1,6 +1,6 @@
 # BLP Converter
 
-BLP Converter is a Windows Forms application for converting BLP (Blizzard Texture Format) images to PNG/JPEG and vice versa.
+BLP Converter is a cross-platform AvaloniaUI application for converting BLP (Blizzard Texture Format) images to PNG/JPEG and vice versa.
 
 ## Features
 
@@ -75,24 +75,23 @@ All settings are automatically saved to a configuration file:
 
 ## Technical Details
 
-- **Framework**: .NET 9.0 Windows
-- **UI**: Windows Forms
+- **Framework**: .NET 9.0
+- **UI**: AvaloniaUI
 - **Image Library**: SixLabors.ImageSharp 3.1.12
+- **BLP Library**: [wow-blp](https://crates.io/crates/wow-blp) (Rust library via FFI)
 - **Supported Formats**: BLP, PNG, JPEG
-- **BLP Code Source**: [SereniaBLPLib](https://github.com/WoW-Tools/SereniaBLPLib)
 
 ## Project Structure
 
 ```
 BlpConverter/
 ├── BLP/
-│   ├── BlpFile.cs          # BLP file reading
-│   ├── BlpWriter.cs        # BLP file writing
-│   └── DXTDecompression.cs # DXT decompression
+│   └── RustBlpConverter.cs # Rust FFI bindings for wow-blp library
 ├── Config/
 │   └── AppConfig.cs        # Configuration management
-├── MainForm.cs             # Main UI logic
-├── MainForm.Designer.cs    # UI design
+├── MainWindow.axaml        # Main window UI (AXAML)
+├── MainWindow.axaml.cs     # Main window logic
+├── App.axaml               # Application resources
 └── Program.cs              # Entry point
 
 ```

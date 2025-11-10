@@ -1,4 +1,5 @@
 using System.Text.Json;
+using static BlpConverter.BLP.RustBlpConverter;
 
 namespace BlpConverter.Config;
 
@@ -52,7 +53,7 @@ public class ConversionSettings
     public ImageFormat DefaultOutputFormat { get; set; } = ImageFormat.Png;
     public int JpegQuality { get; set; } = 95;
     public bool GenerateMipmaps { get; set; } = true;
-    public BlpCompressionFormat BlpCompressionFormat { get; set; } = BlpCompressionFormat.Dxt5;
+    public BlpCompression BlpCompressionFormat { get; set; } = BlpCompression.DXT5;
     public bool PreserveAlpha { get; set; } = true;
 }
 
@@ -60,12 +61,4 @@ public enum ImageFormat
 {
     Png,
     Jpeg
-}
-
-public enum BlpCompressionFormat
-{
-    Dxt1,
-    Dxt3,
-    Dxt5,
-    Uncompressed
 }

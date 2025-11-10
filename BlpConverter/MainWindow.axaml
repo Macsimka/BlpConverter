@@ -5,9 +5,18 @@
         Width="1024"
         Height="768"
         MinWidth="800"
-        MinHeight="600">
+        MinHeight="600"
+        FontSize="12"
+        Icon="Assets/icon.ico">
 
-    <TabControl FontSize="12">
+    <TabControl>
+        <TabControl.Styles>
+            <Style Selector="TabItem">
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="Padding" Value="12,6"/>
+            </Style>
+        </TabControl.Styles>
+
         <!-- Single File Tab -->
         <TabItem Header="Single File">
             <Grid RowDefinitions="Auto,*,Auto" Margin="10">
@@ -49,26 +58,31 @@
                     </Border>
 
                     <!-- File Info and Conversion -->
-                    <StackPanel Grid.Column="1" Spacing="10" Margin="5,0,0,0">
+                    <Grid Grid.Column="1" RowDefinitions="*,Auto" Margin="5,0,0,0">
                         <!-- File Information -->
-                        <Border Background="#1E1E1E"
+                        <Border Grid.Row="0"
+                                Background="#1E1E1E"
                                 BorderBrush="#404040"
                                 BorderThickness="1"
                                 CornerRadius="8"
-                                Padding="15">
-                            <StackPanel>
-                                <TextBlock Text="File Information"
-                                           FontSize="16"
-                                           FontWeight="Bold"
-                                           Margin="0,0,0,10"/>
-                                <TextBlock Name="FileInfoText"
-                                           Text="No file loaded"
-                                           TextWrapping="Wrap"/>
-                            </StackPanel>
+                                Padding="15"
+                                Margin="0,0,0,10">
+                            <ScrollViewer>
+                                <StackPanel>
+                                    <TextBlock Text="File Information"
+                                               FontSize="16"
+                                               FontWeight="Bold"
+                                               Margin="0,0,0,10"/>
+                                    <TextBlock Name="FileInfoText"
+                                               Text="No file loaded"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </ScrollViewer>
                         </Border>
 
                         <!-- Conversion Buttons -->
-                        <Border Background="#1E1E1E"
+                        <Border Grid.Row="1"
+                                Background="#1E1E1E"
                                 BorderBrush="#404040"
                                 BorderThickness="1"
                                 CornerRadius="8"
@@ -92,7 +106,7 @@
                                         IsEnabled="False"/>
                             </StackPanel>
                         </Border>
-                    </StackPanel>
+                    </Grid>
                 </Grid>
             </Grid>
         </TabItem>
@@ -237,10 +251,10 @@
                                 <TextBlock Text="Compression Format:"/>
                                 <ComboBox Name="CmbCompression"
                                           HorizontalAlignment="Stretch">
+                                    <ComboBoxItem Content="Uncompressed"/>
                                     <ComboBoxItem Content="DXT1"/>
                                     <ComboBoxItem Content="DXT3"/>
                                     <ComboBoxItem Content="DXT5"/>
-                                    <ComboBoxItem Content="Uncompressed"/>
                                 </ComboBox>
                             </StackPanel>
                         </StackPanel>
