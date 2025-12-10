@@ -54,7 +54,6 @@ public class ConversionSettings
     public int JpegQuality { get; set; } = 95;
     public bool GenerateMipmaps { get; set; } = true;
     public BlpCompression BlpCompressionFormat { get; set; } = BlpCompression.DXT5;
-    public bool PreserveAlpha { get; set; } = true;
 }
 
 public enum ImageFormat

@@ -236,11 +236,6 @@
                                        FontSize="16"
                                        FontWeight="Bold"/>
 
-                            <!-- Preserve Alpha -->
-                            <CheckBox Name="ChkPreserveAlpha"
-                                      Content="Preserve Alpha"
-                                      IsChecked="True"/>
-
                             <!-- Generate Mipmaps -->
                             <CheckBox Name="ChkGenerateMipmaps"
                                       Content="Generate Mipmaps"

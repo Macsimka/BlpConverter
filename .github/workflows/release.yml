@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    env:
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+      DOTNET_NOLOGO: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore BlpConverter.sln
+
+      - name: Publish single-file (win-x64)
+        run: dotnet publish BlpConverter/BlpConverter.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeAllContentForSelfExtract=true /p:EnableCompressionInSingleFile=true
+
+      - name: Archive build
+        shell: pwsh
+        run: |
+          $publishPath = "BlpConverter/bin/Release/net9.0/win-x64/publish"
+          $zipPath = "blp-converter-win-x64.zip"
+          Compress-Archive -Path "$publishPath/*" -DestinationPath "$zipPath"
+          echo "zip_path=$zipPath" | Out-File -FilePath $Env:GITHUB_OUTPUT -Append
+        id: archive
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v-${{ github.run_number }}-${{ github.sha }}
+          name: BLP Converter ${{ github.sha }}
+          body: |
+            Automated release for commit ${{ github.sha }}.
+            - Target: win-x64
+            - Mode: self-contained single-file publish
+          files: ${{ steps.archive.outputs.zip_path }}

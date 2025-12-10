@@ -73,13 +73,6 @@ public partial class MainWindow : Window
             config.Save();
         };
 
-        ChkPreserveAlpha.IsChecked = config.ConversionSettings.PreserveAlpha;
-        ChkPreserveAlpha.IsCheckedChanged += (_, _) =>
-        {
-            config.ConversionSettings.PreserveAlpha = (bool)ChkPreserveAlpha.IsChecked;
-            config.Save();
-        };
-
         // Set last used folders
         TxtSourceFolder.Text = config.LastSourceFolder;
         TxtTargetFolder.Text = config.LastTargetFolder;

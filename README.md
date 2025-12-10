@@ -1,126 +1,61 @@
 # BLP Converter
 
-BLP Converter is a cross-platform AvaloniaUI application for converting BLP (Blizzard Texture Format) images to PNG/JPEG and vice versa.
+A desktop AvaloniaUI utility for converting BLP (Blizzard Texture Format) images to PNG/JPEG and back. The app uses a native Rust library (`rust_blp_converter`) for the actual BLP work; the repository currently ships a Windows `.dll`. To run on other platforms you need to provide a compatible native build and update the import name if required.
 
 ## Features
 
-### Single File Conversion
-- **Drag & Drop**: Drag files into the window for quick loading
-- **Preview**: Display image in the preview window
-- **File Information**: Detailed information about BLP files:
-  - Dimensions (width x height)
-  - Number of mipmaps
-  - Encoding format (JPEG, Palette, DXT, ARGB8888)
-  - Pixel format (DXT1, DXT3, DXT5, etc.)
-  - Alpha channel depth
-  - File size
-
-- **Conversion**:
+### Single File
+- Drag & drop or file picker for BLP/PNG/JPEG.
+- Preview of the loaded image.
+- BLP metadata readout: version, dimensions, mipmap count, content/compression type, alpha bits, inferred pixel format, file size and estimated uncompressed size.
+- Conversions:
   - BLP → PNG
-  - BLP → JPEG
-  - PNG/JPEG → BLP
+  - BLP → JPEG (uses the native library’s defaults)
+  - PNG/JPEG → BLP using the selected compression and optional mipmap generation
 
 ### Batch Conversion
-- Select source and target folders
-- Automatic conversion of all files in subfolders
-- Progress bar showing conversion status
-- Preserves folder structure
+- Converts BLP/PNG/JPEG recursively, preserving the folder structure.
+- BLP → PNG when alpha is present, otherwise JPEG (uses the configured JPEG quality).
+- PNG/JPEG → BLP with mipmaps optional; compression is DXT5 for PNG inputs and DXT1 for JPEG inputs.
+- Progress bar and counter for long runs.
 
-### Settings
-
-#### Image Export Settings
-- **Default Format**: PNG or JPEG
-- **JPEG Quality**: 1-100 (default 95)
-
-#### BLP Settings
-- **Preserve Alpha**: Keep alpha channel
-- **Generate Mipmaps**: Automatic mipmap generation
-- **Compression Format**: Choose compression format:
-  - DXT1 (smaller size, no alpha or 1-bit alpha)
-  - DXT3 (4-bit alpha)
-  - DXT5 (8-bit interpolated alpha)
-  - Uncompressed (no compression)
-
-### Configuration
-
-All settings are automatically saved to a configuration file:
-- Path: `config.json` (in the application directory)
-- Automatic saving on changes
-- Restores last used folders
-
-## Usage
-
-### Converting a Single File
-
-1. Launch the application
-2. Drag a file into the window or click "Browse..."
-3. Review the preview and file information
-4. Select conversion format (PNG, JPEG, or BLP)
-5. Specify the save path
-
-### Batch Conversion
-
-1. Go to the "Batch Conversion" tab
-2. Select the source folder
-3. Select the target folder
-4. Click "Start Conversion"
-5. Wait for the process to complete
-
-### Configuring Settings
-
-1. Go to the "Settings" tab
-2. Configure image export settings
-3. Configure BLP settings
-4. Changes are saved automatically
+### Settings and Config
+- Default output format selector (stored in config for future use; current conversions are driven by the buttons).
+- JPEG quality (applied to batch BLP→JPEG exports without alpha).
+- BLP compression and mipmap toggle for single-file PNG/JPEG → BLP conversions; mipmap toggle also affects batch conversion.
+- Settings and last used folders persist in `config.json` in the application directory.
 
 ## Technical Details
 
-- **Framework**: .NET 9.0
-- **UI**: AvaloniaUI
-- **Image Library**: SixLabors.ImageSharp 3.1.12
-- **BLP Library**: [wow-blp](https://crates.io/crates/wow-blp) (Rust library via FFI)
-- **Supported Formats**: BLP, PNG, JPEG
+- Framework: .NET 9.0
+- UI: AvaloniaUI 11.3.x
+- Image processing: SixLabors.ImageSharp 3.1.12
+- BLP handling: [wow-blp](https://crates.io/crates/wow-blp) via the native `rust_blp_converter` library
+
+## CI / Releases
+
+Every push triggers GitHub Actions to build a self-contained single-file Windows (`win-x64`) binary and publish a release with a fresh tag based on the commit SHA. The release bundle (`blp-converter-win-x64.zip`) contains the executable and bundled native DLL.
 
 ## Project Structure
 
 ```
 BlpConverter/
-├── BLP/
-│   └── RustBlpConverter.cs # Rust FFI bindings for wow-blp library
-├── Config/
-│   └── AppConfig.cs        # Configuration management
-├── MainWindow.axaml        # Main window UI (AXAML)
-├── MainWindow.axaml.cs     # Main window logic
 ├── App.axaml               # Application resources
-└── Program.cs              # Entry point
-
+├── App.axaml.cs
+├── Assets/icon.ico         # App icon
+├── BLP/RustBlpConverter.cs # P/Invoke bindings to rust_blp_converter
+├── Config/AppConfig.cs     # Config persistence
+├── MainWindow.axaml        # UI layout
+├── MainWindow.axaml.cs     # UI logic and conversions
+├── Program.cs              # Entry point
+└── rust_blp_converter.dll  # Native library (Windows build)
 ```
 
-## Building the Project
+## Building and Running
 
 ```bash
 dotnet build
-```
-
-## Running
-
-```bash
 dotnet run --project BlpConverter
 ```
 
-## BLP Format Features
-
-BLP (Blizzard Picture) is an image format used in Blizzard Entertainment games (World of Warcraft, Warcraft III, etc.).
-
-### Format Versions
-- **BLP0/BLP1**: Legacy versions
-- **BLP2**: Current version (used in this application)
-
-### Encoding Types
-- **JPEG**: JPEG compression
-- **Palette**: Paletted image (256 colors)
-- **DXT**: DirectX compression (DXT1, DXT3, DXT5)
-- **ARGB8888**: Uncompressed 32-bit image
-
-### Mipmaps
-BLP files can contain mipmaps - reduced versions of the image for performance optimization in games.
+Ensure `rust_blp_converter.dll` (or a platform-appropriate build) is available alongside the executable or in the working directory.
