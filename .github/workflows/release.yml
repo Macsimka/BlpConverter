@@ -27,12 +27,12 @@ jobs:
         run: dotnet restore BlpConverter.sln
 
       - name: Publish single-file (win-x64)
-        run: dotnet publish BlpConverter/BlpConverter.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeAllContentForSelfExtract=true /p:EnableCompressionInSingleFile=true
+        run: dotnet publish BlpConverter/BlpConverter.csproj -c Release -r win-x64 --self-contained true -o artifacts/win-x64 /p:PublishSingleFile=true /p:IncludeAllContentForSelfExtract=true /p:EnableCompressionInSingleFile=true
 
       - name: Archive build
         shell: pwsh
         run: |
-          $publishPath = "BlpConverter/bin/Release/net9.0/win-x64/publish"
+          $publishPath = "artifacts/win-x64"
           $zipPath = "blp-converter-win-x64.zip"
           Compress-Archive -Path "$publishPath/*" -DestinationPath "$zipPath"
           echo "zip_path=$zipPath" | Out-File -FilePath $Env:GITHUB_OUTPUT -Append
