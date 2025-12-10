@@ -2,6 +2,8 @@
 
 A desktop AvaloniaUI utility for converting BLP (Blizzard Texture Format) images to PNG/JPEG and back. The app uses a native Rust library (`rust_blp_converter`) for the actual BLP work; the repository currently ships a Windows `.dll`. To run on other platforms you need to provide a compatible native build and update the import name if required.
 
+![BLP Converter UI](Assets/screenshot.png)
+
 ## Features
 
 ### Single File
