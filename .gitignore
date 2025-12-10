@@ -36,6 +36,7 @@ bld/
 # Build Results
 *.exe
 *.dll
+!**/rust_blp_converter.dll
 *.pdb
 *.cache
 
