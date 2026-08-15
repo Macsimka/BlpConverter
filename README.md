@@ -17,14 +17,15 @@ A desktop AvaloniaUI utility for converting BLP (Blizzard Texture Format) images
 
 ### Batch Conversion
 - Converts BLP/PNG/JPEG recursively, preserving the folder structure.
-- BLP → PNG when alpha is present, otherwise JPEG (uses the configured JPEG quality).
-- PNG/JPEG → BLP with mipmaps optional; compression is DXT5 for PNG inputs and DXT1 for JPEG inputs.
+- BLP → PNG or JPEG according to the configured default output format. PNG uses the same native conversion path as single-file conversion so BLP alpha metadata is handled consistently.
+- PNG/JPEG → BLP using the configured compression and mipmap settings.
 - Progress bar and counter for long runs.
 
 ### Settings and Config
-- Default output format selector (stored in config for future use; current conversions are driven by the buttons).
-- JPEG quality (applied to batch BLP→JPEG exports without alpha).
-- BLP compression and mipmap toggle for single-file PNG/JPEG → BLP conversions; mipmap toggle also affects batch conversion.
+- Default output format selector controls batch BLP exports; single-file conversions are driven by their buttons.
+- JPEG quality applies to batch BLP → JPEG exports.
+- BLP compression and mipmap settings apply to both single-file and batch PNG/JPEG → BLP conversions.
+- Optional World of Warcraft compatibility resize expands each non-power-of-two dimension to the next power of two while preserving RGBA transparency.
 - Settings and last used folders persist in `config.json` in the application directory.
 
 ## Technical Details

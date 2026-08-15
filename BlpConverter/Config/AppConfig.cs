@@ -53,6 +53,7 @@ public class ConversionSettings
     public ImageFormat DefaultOutputFormat { get; set; } = ImageFormat.Png;
     public int JpegQuality { get; set; } = 95;
     public bool GenerateMipmaps { get; set; } = true;
+    public bool ResizeToPowerOfTwo { get; set; } = true;
     public BlpCompression BlpCompressionFormat { get; set; } = BlpCompression.DXT5;
 }
 
