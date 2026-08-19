@@ -241,6 +241,11 @@
                                       Content="Generate Mipmaps"
                                       IsChecked="True"/>
 
+                            <!-- World of Warcraft-compatible dimensions -->
+                            <CheckBox Name="ChkResizeToPowerOfTwo"
+                                      Content="Resize to power-of-two dimensions (WoW compatible)"
+                                      IsChecked="True"/>
+
                             <!-- Compression Format -->
                             <StackPanel Spacing="5">
                                 <TextBlock Text="Compression Format:"/>

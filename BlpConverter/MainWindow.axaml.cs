@@ -73,6 +73,13 @@ public partial class MainWindow : Window
             config.Save();
         };
 
+        ChkResizeToPowerOfTwo.IsChecked = config.ConversionSettings.ResizeToPowerOfTwo;
+        ChkResizeToPowerOfTwo.IsCheckedChanged += (_, _) =>
+        {
+            config.ConversionSettings.ResizeToPowerOfTwo = ChkResizeToPowerOfTwo.IsChecked == true;
+            config.Save();
+        };
+
         // Set last used folders
         TxtSourceFolder.Text = config.LastSourceFolder;
         TxtTargetFolder.Text = config.LastTargetFolder;
@@ -301,8 +308,18 @@ public partial class MainWindow : Window
         {
             try
             {
-                RustBlpConverter.ImageToBlp(currentFilePath, file.Path.LocalPath, config.ConversionSettings.BlpCompressionFormat, config.ConversionSettings.GenerateMipmaps ? 0 : 1);
-                await ShowMessage("Success", "File converted successfully!", MsBox.Avalonia.Enums.Icon.Success);
+                string resizeMessage = ConvertImageToBlp(
+                    currentFilePath,
+                    file.Path.LocalPath,
+                    config.ConversionSettings.BlpCompressionFormat,
+                    config.ConversionSettings.GenerateMipmaps,
+                    config.ConversionSettings.ResizeToPowerOfTwo);
+
+                string message = "File converted successfully!";
+                if (resizeMessage != null)
+                    message += $"\n\n{resizeMessage}";
+
+                await ShowMessage("Success", message, MsBox.Avalonia.Enums.Icon.Success);
             }
             catch (Exception ex)
             {
@@ -371,6 +388,12 @@ public partial class MainWindow : Window
             // Get UI values before entering background threads
             var sourceFolder = TxtSourceFolder.Text;
             var targetFolder = TxtTargetFolder.Text;
+            var outputFormat = config.ConversionSettings.DefaultOutputFormat;
+            var compression = config.ConversionSettings.BlpCompressionFormat;
+            var generateMipmaps = config.ConversionSettings.GenerateMipmaps;
+            var resizeToPowerOfTwo = config.ConversionSettings.ResizeToPowerOfTwo;
+            var jpegQuality = config.ConversionSettings.JpegQuality;
+            int resizedFiles = 0;
 
             for (int i = 0; i < files.Length; i++)
             {
@@ -378,61 +401,54 @@ public partial class MainWindow : Window
                 var relativePath = Path.GetRelativePath(sourceFolder, sourceFile);
                 var ext = Path.GetExtension(sourceFile).ToLowerInvariant();
 
-                // Convert file
-                await Task.Run(() =>
+                bool wasResized = await Task.Run(() =>
                 {
                     string targetFile;
 
                     if (ext == ".blp")
                     {
-                        // Get BLP info to check for alpha channel
-                        BlpInfo info = new();
-                        int result = RustBlpConverter.blp_get_info_extended(sourceFile, ref info);
-                        if (result != 0)
-                            return;
-
-                        // Automatically choose format based on alpha channel presence
-                        bool hasAlpha = info.AlphaBits > 0;
-                        var targetExt = hasAlpha ? ".png" : ".jpg";
+                        // Use the configured output format. PNG conversion goes through the
+                        // same native path as single-file conversion so BLP alpha settings
+                        // are interpreted consistently.
+                        var targetExt = outputFormat == ImageFormat.Png ? ".png" : ".jpg";
 
                         targetFile = Path.Combine(targetFolder, Path.ChangeExtension(relativePath, targetExt));
+                        CreateParentDirectory(targetFile);
 
-                        // Create target directory if needed
-                        var targetDir = Path.GetDirectoryName(targetFile);
-                        if (!Directory.Exists(targetDir))
-                            Directory.CreateDirectory(targetDir!);
-
-                        using var image = RustBlpConverter.LoadBlp(sourceFile);
-
-                        if (hasAlpha)
-                            image.SaveAsPng(targetFile);
+                        if (outputFormat == ImageFormat.Png)
+                            RustBlpConverter.BlpToImage(sourceFile, targetFile);
                         else
-                            image.SaveAsJpeg(targetFile, new JpegEncoder { Quality = config.ConversionSettings.JpegQuality });
+                        {
+                            using var image = RustBlpConverter.LoadBlp(sourceFile);
+                            image.SaveAsJpeg(targetFile, new JpegEncoder { Quality = jpegQuality });
+                        }
+
+                        return false;
                     }
-                    else
-                    {
-                        BlpCompression compression = BlpCompression.DXT5;
 
-                        if (ext is ".jpg" or ".jpeg")
-                            compression = BlpCompression.DXT1;
+                    targetFile = Path.Combine(targetFolder, Path.ChangeExtension(relativePath, ".blp"));
+                    CreateParentDirectory(targetFile);
 
-                        // Convert PNG/JPEG to BLP
-                        targetFile = Path.Combine(targetFolder, Path.ChangeExtension(relativePath, ".blp"));
-
-                        // Create target directory if needed
-                        var targetDir = Path.GetDirectoryName(targetFile);
-                        if (!Directory.Exists(targetDir))
-                            Directory.CreateDirectory(targetDir!);
-
-                        RustBlpConverter.ImageToBlp(sourceFile, targetFile, compression, config.ConversionSettings.GenerateMipmaps ? 0 : 1);
-                    }
+                    return ConvertImageToBlp(
+                        sourceFile,
+                        targetFile,
+                        compression,
+                        generateMipmaps,
+                        resizeToPowerOfTwo) != null;
                 });
+
+                if (wasResized)
+                    resizedFiles++;
 
                 BatchProgressBar.Value = i + 1;
                 LblProgress.Text = $"Progress: {i + 1}/{files.Length}";
             }
 
-            await ShowMessage("Success", $"Batch conversion completed! Converted {files.Length} files.", MsBox.Avalonia.Enums.Icon.Success);
+            string message = $"Batch conversion completed! Converted {files.Length} files.";
+            if (resizedFiles > 0)
+                message += $"\nResized {resizedFiles} file(s) to power-of-two dimensions.";
+
+            await ShowMessage("Success", message, MsBox.Avalonia.Enums.Icon.Success);
         }
         catch (Exception ex)
         {
@@ -444,6 +460,32 @@ public partial class MainWindow : Window
             BatchProgressBar.Value = 0;
             LblProgress.Text = "Progress:";
         }
+    }
+
+    private static string ConvertImageToBlp(
+        string sourceFile,
+        string targetFile,
+        BlpCompression compression,
+        bool generateMipmaps,
+        bool resizeToPowerOfTwo)
+    {
+        using var prepared = BlpInputPreprocessor.Prepare(sourceFile, resizeToPowerOfTwo);
+        RustBlpConverter.ImageToBlp(
+            prepared.Path,
+            targetFile,
+            compression,
+            generateMipmaps ? 0 : 1);
+
+        return prepared.WasResized
+            ? $"Size adjusted: {prepared.OriginalWidth}x{prepared.OriginalHeight} → {prepared.Width}x{prepared.Height}"
+            : null;
+    }
+
+    private static void CreateParentDirectory(string filePath)
+    {
+        string directory = Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrEmpty(directory))
+            Directory.CreateDirectory(directory);
     }
 
     private async Task ShowMessage(string title, string message, Icon icon)
